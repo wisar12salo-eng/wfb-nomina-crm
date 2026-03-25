@@ -1,0 +1,1409 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WFB NÓMINA *² | Gestión Pro ERP</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #f4f4f5; color: #1a1a1a; }
+        .sidebar-item { transition: all 0.3s; border-radius: 8px; margin-bottom: 4px; }
+        .sidebar-item:hover { background-color: #2563eb; color: white; }
+        .sidebar-item.active { background-color: #2563eb; color: white; box-shadow: 4px 4px 0px 0px rgba(0,0,0,1); }
+        .wfb-card { background: white; border: 4px solid #09090b; }
+        .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:50; display:flex; align-items:center; justify-content:center; }
+        .modal-box { background:white; border:4px solid #111; max-width:700px; width:95%; max-height:90vh; overflow-y:auto; border-radius:12px; }
+        #splash-loading { position:fixed; inset:0; background:linear-gradient(135deg, #09090b 0%, #1a1a2e 100%); z-index:9999; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:24px; opacity:1; pointer-events:auto; }
+        .suggestion-item.selected { background:#1d4ed8; color:#fff; }
+        .suggestion-item { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .splash-spinner { width:60px; height:60px; border:4px solid rgba(37, 99, 235, 0.2); border-top-color:#2563eb; border-radius:50%; animation:spin 1s linear infinite; }
+        @keyframes spin { to { transform:rotate(360deg); } }
+        .splash-text { color:white; font-family:'Inter', sans-serif; font-size:14px; font-weight:700; text-transform:uppercase; letter-spacing:2px; }
+    </style>
+</head>
+<body class="flex h-screen overflow-hidden">
+    <!-- SPLASH LOADING -->
+    <div id="splash-loading">
+        <div class="splash-spinner"></div>
+        <div class="splash-text">Cargando...</div>
+    </div>
+
+    <!-- SIDEBAR -->
+    <aside class="w-64 bg-zinc-900 text-white flex flex-col border-r-4 border-black shrink-0">
+        <div class="p-6 border-b border-zinc-800">
+            <h1 class="text-2xl font-black italic uppercase tracking-tighter text-white">WFB <span class="text-blue-500">*²</span></h1>
+            <p class="text-[9px] uppercase opacity-50 font-bold tracking-widest">Bello | Admin System</p>
+        </div>
+        <nav class="flex-1 mt-6 px-4">
+            <button onclick="switchTab('nomina')" id="btn-nomina" class="sidebar-item active w-full flex items-center px-4 py-3 text-[10px] font-black uppercase italic">
+                <i class="fa-solid fa-receipt mr-3 text-sm"></i> Nómina Mensual
+            </button>
+            <button onclick="switchTab('empleados')" id="btn-empleados" class="sidebar-item w-full flex items-center px-4 py-3 text-[10px] font-black uppercase italic opacity-60 hover:opacity-100">
+                <i class="fa-solid fa-address-book mr-3 text-sm"></i> Maestro Empleados
+            </button>
+            <button onclick="switchTab('seguridad')" id="btn-seguridad" class="sidebar-item w-full flex items-center px-4 py-3 text-[10px] font-black uppercase italic hover:opacity-100">
+                <i class="fa-solid fa-shield-halved mr-3 text-sm"></i> Seguridad Social
+            </button>
+            <button onclick="switchTab('contabilidad')" id="btn-contabilidad" class="sidebar-item w-full flex items-center px-4 py-3 text-[10px] font-black uppercase italic hover:opacity-100">
+                <i class="fa-solid fa-calculator mr-3 text-sm"></i> Contabilidad (PUC)
+            </button>
+            <button onclick="switchTab('pagos')" id="btn-pagos" class="sidebar-item w-full flex items-center px-4 py-3 text-[10px] font-black uppercase italic hover:opacity-100">
+                <i class="fa-solid fa-money-check-dollar mr-3 text-sm"></i> Reporte Pagos
+            </button>
+        </nav>
+        <div class="p-6 border-t border-zinc-800 bg-zinc-950">
+            <p id="nombre-usuario" class="text-[10px] font-black uppercase text-blue-400 leading-none"></p>
+            <p id="rol-usuario" class="text-[8px] font-bold uppercase text-zinc-500 mt-1 mb-3"></p>
+            <button onclick="cerrarSesion()" class="w-full bg-red-600 hover:bg-red-700 text-white text-[9px] font-black py-2 uppercase rounded transition-all">Cerrar Sesión</button>
+        </div>
+    </aside>
+
+    <!-- MAIN -->
+    <main class="flex-1 overflow-y-auto p-8 bg-zinc-100">
+
+        <!-- TAB NÓMINA -->
+        <div id="tab-nomina" class="tab-content">
+            <header class="mb-8">
+                <h2 class="text-4xl font-black uppercase italic tracking-tighter text-zinc-900">Liquidación de Nómina</h2>
+                <div class="h-2 w-24 bg-blue-600 mt-2"></div>
+            </header>
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                <div class="lg:col-span-4 bg-white p-6 rounded-xl border-4 border-zinc-900 shadow-[6px_6px_0px_0px_rgba(37,99,235,1)]">
+                    <form id="form-nomina" class="space-y-3 text-zinc-900">
+                        <h2 class="text-[11px] font-black uppercase border-b-2 border-zinc-100 pb-2 mb-4 italic text-blue-600">Entrada de Datos</h2>
+                        <input id="empleado_buscar" class="w-full p-2 bg-zinc-50 border-2 border-zinc-200 font-black text-xs outline-none focus:border-blue-600" placeholder="Buscar empleado (autocomplete)" autocomplete="off" required>
+                        <div id="dropdown-suggestions" class="hidden absolute z-10 mt-1 w-full bg-white border border-zinc-300 rounded shadow-lg max-h-52 overflow-auto"></div>
+                        <select id="empleado_id" hidden>
+                            <option value="">Selecciona un empleado</option>
+                        </select>
+                        <input type="text" id="nombre" placeholder="NOMBRE" class="w-full p-2 bg-zinc-50 border-2 border-zinc-200 font-black text-xs outline-none focus:border-blue-600" readonly>
+                        <input type="text" id="cedula" placeholder="CÉDULA" class="w-full p-2 bg-zinc-50 border-2 border-zinc-200 font-black text-xs outline-none focus:border-blue-600" readonly>
+                        <input type="text" id="cargo" placeholder="CARGO" class="w-full p-2 bg-zinc-50 border-2 border-zinc-200 font-black text-xs outline-none focus:border-blue-600" readonly>
+                        <input type="number" id="salario" placeholder="SALARIO BASE" class="w-full p-2 bg-zinc-50 border-2 border-zinc-200 font-black text-xs outline-none focus:border-blue-600" readonly>
+                        <div class="grid grid-cols-2 gap-2">
+                            <input type="number" id="dias" placeholder="DÍAS TRABAJADOS" class="p-2 bg-zinc-50 border-2 border-zinc-200 font-black text-xs outline-none focus:border-blue-600" value="30" required min="1" max="31">
+                            <input type="text" id="periodo" placeholder="PERIODO (Eje: Marzo 2026)" class="p-2 bg-zinc-50 border-2 border-zinc-200 font-black text-xs outline-none focus:border-blue-600" required>
+                        </div>
+                        <button id="btn-grabar-nomina" type="submit" class="w-full bg-zinc-900 hover:bg-blue-600 text-white font-black py-4 uppercase text-xs transition-all italic">Sincronizar a DB</button>
+                        <div id="nomina-status" class="text-[10px] font-bold text-zinc-700 mt-2"></div>
+                    </form>
+                </div>
+                <div class="lg:col-span-8 bg-white rounded-xl border-4 border-zinc-900 overflow-hidden text-zinc-900 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]">
+                    <div class="p-4 bg-zinc-50 border-b-2 border-zinc-200">
+                        <button id="btn-exportar-excel" onclick="descargarExcel()" class="w-full bg-green-600 hover:bg-green-700 text-white font-black py-3 rounded text-[10px] uppercase italic transition-all">📥 EXPORTAR REPOSITORIO (.XLSX)</button>
+                    </div>
+                    <div class="p-4 bg-zinc-800 space-y-3">
+                        <input type="text" id="buscador" placeholder="🔍 FILTRAR POR NOMBRE O CÉDULA..." class="w-full p-3 bg-zinc-900 text-white border-2 border-blue-600 font-black text-[10px] uppercase outline-none">
+                        <select id="filtro-estado-pago" class="w-full p-3 bg-zinc-900 text-white border-2 border-blue-600 font-black text-[10px] uppercase outline-none">
+                            <option value="">MOSTRAR TODOS</option>
+                            <option value="pendiente">SOLO PENDIENTES</option>
+                            <option value="pagada">SOLO PAGADAS</option>
+                        </select>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full">
+                            <thead class="bg-zinc-100 font-black uppercase text-[9px] italic text-zinc-500">
+                                <tr>
+                                    <th class="px-6 py-4 text-left">Información Empleado</th>
+                                    <th class="px-6 py-4 text-center">Neto</th>
+                                    <th class="px-6 py-4 text-center">Estado Pago</th>
+                                    <th class="px-6 py-4 text-right">Gestión</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabla-body" class="divide-y divide-zinc-100"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB EMPLEADOS -->
+        <div id="tab-empleados" class="tab-content hidden">
+            <header class="mb-8 flex justify-between items-center">
+                <div>
+                    <h2 class="text-4xl font-black uppercase italic tracking-tighter text-zinc-900">Maestro de Empleados</h2>
+                    <div class="h-2 w-24 bg-blue-600 mt-2"></div>
+                </div>
+                <button onclick="abrirModalEmpleado()" class="bg-zinc-900 hover:bg-blue-600 text-white font-black px-6 py-3 text-xs uppercase italic transition-all rounded">
+                    + Nuevo Empleado
+                </button>
+            </header>
+
+            <div class="bg-white rounded-xl border-4 border-zinc-900 overflow-hidden shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]">
+                <div class="p-4 bg-zinc-800">
+                    <input type="text" id="buscador-emp" placeholder="🔍 BUSCAR POR NOMBRE O CÉDULA..." class="w-full p-3 bg-zinc-900 text-white border-2 border-blue-600 font-black text-[10px] uppercase outline-none" oninput="filtrarEmpleados(this.value)">
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full">
+                        <thead class="bg-zinc-100 font-black uppercase text-[9px] italic text-zinc-500">
+                            <tr>
+                                <th class="px-4 py-4 text-left">Empleado</th>
+                                <th class="px-4 py-4 text-left">Contacto</th>
+                                <th class="px-4 py-4 text-left">Cargo / Salario</th>
+                                <th class="px-4 py-4 text-left">Banco</th>
+                                <th class="px-4 py-4 text-right">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabla-empleados" class="divide-y divide-zinc-100"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB SEGURIDAD SOCIAL -->
+        <div id="tab-seguridad" class="tab-content hidden">
+            <header class="mb-8">
+                <h2 class="text-4xl font-black uppercase italic tracking-tighter text-zinc-900">Seguridad Social</h2>
+                <div class="h-2 w-24 bg-blue-600 mt-2"></div>
+            </header>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div class="bg-white p-6 rounded-xl border-4 border-zinc-900 shadow-[6px_6px_0px_0px_rgba(37,99,235,1)]">
+                    <h3 class="text-lg font-black uppercase italic text-zinc-900 mb-4">Configuración de Porcentajes</h3>
+                    <div class="space-y-3">
+                        <div class="grid grid-cols-2 gap-2">
+                            <label class="text-xs font-bold uppercase text-zinc-600">Salud Empleador (%)</label>
+                            <input type="number" id="porc-salud-emp" value="8.5" step="0.1" class="p-2 bg-zinc-50 border-2 border-zinc-200 font-black text-xs outline-none focus:border-blue-600">
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <label class="text-xs font-bold uppercase text-zinc-600">Pensión Empleador (%)</label>
+                            <input type="number" id="porc-pension-emp" value="12" step="0.1" class="p-2 bg-zinc-50 border-2 border-zinc-200 font-black text-xs outline-none focus:border-blue-600">
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <label class="text-xs font-bold uppercase text-zinc-600">Riesgos Laborales (%)</label>
+                            <input type="number" id="porc-arl" value="0.522" step="0.001" class="p-2 bg-zinc-50 border-2 border-zinc-200 font-black text-xs outline-none focus:border-blue-600">
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <label class="text-xs font-bold uppercase text-zinc-600">Caja Compensación (%)</label>
+                            <input type="number" id="porc-caja" value="4" step="0.1" class="p-2 bg-zinc-50 border-2 border-zinc-200 font-black text-xs outline-none focus:border-blue-600">
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <label class="text-xs font-bold uppercase text-zinc-600">SENA (%)</label>
+                            <input type="number" id="porc-sena" value="2" step="0.1" class="p-2 bg-zinc-50 border-2 border-zinc-200 font-black text-xs outline-none focus:border-blue-600">
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <label class="text-xs font-bold uppercase text-zinc-600">ICBF (%)</label>
+                            <input type="number" id="porc-icbf" value="3" step="0.1" class="p-2 bg-zinc-50 border-2 border-zinc-200 font-black text-xs outline-none focus:border-blue-600">
+                        </div>
+                        <button onclick="calcularSeguridadSocial()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-3 uppercase text-xs transition-all italic">Calcular Aportes</button>
+                    </div>
+                </div>
+                <div class="bg-white p-6 rounded-xl border-4 border-zinc-900 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]">
+                    <h3 class="text-lg font-black uppercase italic text-zinc-900 mb-4">Totales Mensuales</h3>
+                    <div class="space-y-2 text-sm">
+                        <div class="flex justify-between"><span class="font-bold">Salud Empleador:</span> <span id="total-salud-emp" class="font-black text-blue-600">$0</span></div>
+                        <div class="flex justify-between"><span class="font-bold">Pensión Empleador:</span> <span id="total-pension-emp" class="font-black text-blue-600">$0</span></div>
+                        <div class="flex justify-between"><span class="font-bold">Riesgos Laborales:</span> <span id="total-arl" class="font-black text-blue-600">$0</span></div>
+                        <div class="flex justify-between"><span class="font-bold">Caja Compensación:</span> <span id="total-caja" class="font-black text-blue-600">$0</span></div>
+                        <div class="flex justify-between"><span class="font-bold">SENA:</span> <span id="total-sena" class="font-black text-blue-600">$0</span></div>
+                        <div class="flex justify-between"><span class="font-bold">ICBF:</span> <span id="total-icbf" class="font-black text-blue-600">$0</span></div>
+                        <hr class="my-2">
+                        <div class="flex justify-between text-lg"><span class="font-black uppercase">Total Aportes:</span> <span id="total-general" class="font-black text-red-600">$0</span></div>
+                    </div>
+                </div>
+            </div>
+            <div class="mt-8 bg-white rounded-xl border-4 border-zinc-900 overflow-hidden shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]">
+                <div class="p-4 bg-zinc-50 border-b-2 border-zinc-200">
+                    <h3 class="text-lg font-black uppercase italic text-zinc-900">Detalle por Empleado</h3>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full">
+                        <thead class="bg-zinc-100 font-black uppercase text-[9px] italic text-zinc-500">
+                            <tr>
+                                <th class="px-6 py-4 text-left">Empleado</th>
+                                <th class="px-6 py-4 text-center">IBC</th>
+                                <th class="px-6 py-4 text-center">Salud Emp</th>
+                                <th class="px-6 py-4 text-center">Pensión Emp</th>
+                                <th class="px-6 py-4 text-center">ARL</th>
+                                <th class="px-6 py-4 text-center">Caja</th>
+                                <th class="px-6 py-4 text-center">SENA</th>
+                                <th class="px-6 py-4 text-center">ICBF</th>
+                                <th class="px-6 py-4 text-center">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabla-seguridad" class="divide-y divide-zinc-100"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB CONTABILIDAD (PUC) -->
+        <div id="tab-contabilidad" class="tab-content hidden">
+            <header class="mb-8">
+                <h2 class="text-4xl font-black uppercase italic tracking-tighter text-zinc-900">Contabilidad (PUC)</h2>
+                <div class="h-2 w-24 bg-blue-600 mt-2"></div>
+            </header>
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div class="lg:col-span-1 bg-white p-6 rounded-xl border-4 border-zinc-900 shadow-[6px_6px_0px_0px_rgba(37,99,235,1)]">
+                    <h3 class="text-lg font-black uppercase italic text-zinc-900 mb-4">Configuración PUC</h3>
+                    <div class="space-y-3">
+                        <div class="grid grid-cols-1 gap-2">
+                            <label class="text-xs font-bold uppercase text-zinc-600">Cuenta Sueldos y Salarios</label>
+                            <input type="text" id="cuenta-sueldos" value="510501" class="p-2 bg-zinc-50 border-2 border-zinc-200 font-black text-xs outline-none focus:border-blue-600" placeholder="510501">
+                        </div>
+                        <div class="grid grid-cols-1 gap-2">
+                            <label class="text-xs font-bold uppercase text-zinc-600">Cuenta Auxilio Transporte</label>
+                            <input type="text" id="cuenta-auxilio" value="510502" class="p-2 bg-zinc-50 border-2 border-zinc-200 font-black text-xs outline-none focus:border-blue-600" placeholder="510502">
+                        </div>
+                        <div class="grid grid-cols-1 gap-2">
+                            <label class="text-xs font-bold uppercase text-zinc-600">Cuenta Aportes Salud</label>
+                            <input type="text" id="cuenta-salud" value="51051001" class="p-2 bg-zinc-50 border-2 border-zinc-200 font-black text-xs outline-none focus:border-blue-600" placeholder="51051001">
+                        </div>
+                        <div class="grid grid-cols-1 gap-2">
+                            <label class="text-xs font-bold uppercase text-zinc-600">Cuenta Aportes Pensión</label>
+                            <input type="text" id="cuenta-pension" value="51051002" class="p-2 bg-zinc-50 border-2 border-zinc-200 font-black text-xs outline-none focus:border-blue-600" placeholder="51051002">
+                        </div>
+                        <div class="grid grid-cols-1 gap-2">
+                            <label class="text-xs font-bold uppercase text-zinc-600">Cuenta Riesgos Laborales</label>
+                            <input type="text" id="cuenta-arl" value="51051003" class="p-2 bg-zinc-50 border-2 border-zinc-200 font-black text-xs outline-none focus:border-blue-600" placeholder="51051003">
+                        </div>
+                        <div class="grid grid-cols-1 gap-2">
+                            <label class="text-xs font-bold uppercase text-zinc-600">Cuenta Caja Compensación</label>
+                            <input type="text" id="cuenta-caja" value="51051004" class="p-2 bg-zinc-50 border-2 border-zinc-200 font-black text-xs outline-none focus:border-blue-600" placeholder="51051004">
+                        </div>
+                        <div class="grid grid-cols-1 gap-2">
+                            <label class="text-xs font-bold uppercase text-zinc-600">Cuenta SENA</label>
+                            <input type="text" id="cuenta-sena" value="51051005" class="p-2 bg-zinc-50 border-2 border-zinc-200 font-black text-xs outline-none focus:border-blue-600" placeholder="51051005">
+                        </div>
+                        <div class="grid grid-cols-1 gap-2">
+                            <label class="text-xs font-bold uppercase text-zinc-600">Cuenta ICBF</label>
+                            <input type="text" id="cuenta-icbf" value="51051006" class="p-2 bg-zinc-50 border-2 border-zinc-200 font-black text-xs outline-none focus:border-blue-600" placeholder="51051006">
+                        </div>
+                        <div class="grid grid-cols-1 gap-2">
+                            <label class="text-xs font-bold uppercase text-zinc-600">Cuenta Obligaciones Laborales</label>
+                            <input type="text" id="cuenta-obligaciones" value="236501" class="p-2 bg-zinc-50 border-2 border-zinc-200 font-black text-xs outline-none focus:border-blue-600" placeholder="236501">
+                        </div>
+                        <button onclick="generarAsientosContables()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-3 uppercase text-xs transition-all italic">Generar Asientos</button>
+                    </div>
+                </div>
+                <div class="lg:col-span-2 bg-white p-6 rounded-xl border-4 border-zinc-900 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]">
+                    <h3 class="text-lg font-black uppercase italic text-zinc-900 mb-4">Asientos Contables Generados</h3>
+                    <div class="space-y-4">
+                        <div class="bg-zinc-50 p-4 rounded border-2 border-zinc-200">
+                            <h4 class="font-black uppercase text-sm text-zinc-900 mb-2">RESUMEN MENSUAL</h4>
+                            <div class="grid grid-cols-2 gap-4 text-xs">
+                                <div>
+                                    <span class="font-bold">Total Débitos:</span>
+                                    <span id="total-debitos" class="font-black text-red-600">$0</span>
+                                </div>
+                                <div>
+                                    <span class="font-bold">Total Créditos:</span>
+                                    <span id="total-creditos" class="font-black text-blue-600">$0</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full">
+                                <thead class="bg-zinc-100 font-black uppercase text-[9px] italic text-zinc-500">
+                                    <tr>
+                                        <th class="px-4 py-3 text-left">Cuenta PUC</th>
+                                        <th class="px-4 py-3 text-left">Descripción</th>
+                                        <th class="px-4 py-3 text-center">Débito</th>
+                                        <th class="px-4 py-3 text-center">Crédito</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tabla-asientos" class="divide-y divide-zinc-100"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="mt-8 bg-white rounded-xl border-4 border-zinc-900 overflow-hidden shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]">
+                <div class="p-4 bg-zinc-50 border-b-2 border-zinc-200">
+                    <h3 class="text-lg font-black uppercase italic text-zinc-900">Detalle por Empleado</h3>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full">
+                        <thead class="bg-zinc-100 font-black uppercase text-[9px] italic text-zinc-500">
+                            <tr>
+                                <th class="px-6 py-4 text-left">Empleado</th>
+                                <th class="px-6 py-4 text-center">Sueldo</th>
+                                <th class="px-6 py-4 text-center">Aux. Transp.</th>
+                                <th class="px-6 py-4 text-center">Salud Emp</th>
+                                <th class="px-6 py-4 text-center">Pensión Emp</th>
+                                <th class="px-6 py-4 text-center">ARL</th>
+                                <th class="px-6 py-4 text-center">Caja</th>
+                                <th class="px-6 py-4 text-center">SENA</th>
+                                <th class="px-6 py-4 text-center">ICBF</th>
+                                <th class="px-6 py-4 text-center">Neto Empleado</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabla-detalle-contable" class="divide-y divide-zinc-100"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB PAGOS -->
+        <div id="tab-pagos" class="tab-content hidden">
+            <header class="mb-8">
+                <h2 class="text-4xl font-black uppercase italic tracking-tighter text-zinc-900">Reporte de Pagos</h2>
+                <div class="h-2 w-24 bg-blue-600 mt-2"></div>
+            </header>
+            <div class="bg-white rounded-xl border-4 border-zinc-900 overflow-hidden shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]">
+                <div class="p-4 bg-zinc-50 border-b-2 border-zinc-200 flex justify-between items-center">
+                    <h3 class="text-lg font-black uppercase italic text-zinc-900">Resumen de Pagos por Empleado</h3>
+                    <button id="btn-exportar-pagos" onclick="exportarReportePagos()" class="bg-green-600 hover:bg-green-700 text-white font-black px-4 py-2 rounded text-[10px] uppercase italic transition-all">📥 Exportar Pagos</button>
+                </div>
+                <div class="p-4 bg-zinc-100 border-b border-zinc-300">
+                    <div class="grid grid-cols-4 gap-4 text-center">
+                        <div>
+                            <div class="text-[9px] font-bold text-zinc-600 uppercase">Total Pagado</div>
+                            <div id="total-pagado-resumen" class="text-2xl font-black text-green-600">$0</div>
+                        </div>
+                        <div>
+                            <div class="text-[9px] font-bold text-zinc-600 uppercase">Total Pendiente</div>
+                            <div id="total-pendiente-resumen" class="text-2xl font-black text-red-600">$0</div>
+                        </div>
+                        <div>
+                            <div class="text-[9px] font-bold text-zinc-600 uppercase">Nóminas Pagadas</div>
+                            <div id="count-pagadas-resumen" class="text-2xl font-black text-blue-600">0</div>
+                        </div>
+                        <div>
+                            <div class="text-[9px] font-bold text-zinc-600 uppercase">Nóminas Pendientes</div>
+                            <div id="count-pendientes-resumen" class="text-2xl font-black text-orange-600">0</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full">
+                        <thead class="bg-zinc-100 font-black uppercase text-[9px] italic text-zinc-500">
+                            <tr>
+                                <th class="px-6 py-4 text-left">Empleado</th>
+                                <th class="px-6 py-4 text-center">Cédula</th>
+                                <th class="px-6 py-4 text-center">Cargo</th>
+                                <th class="px-6 py-4 text-center">Nóminas Pagadas</th>
+                                <th class="px-6 py-4 text-center">Nóminas Pendientes</th>
+                                <th class="px-6 py-4 text-center">Total Pagado</th>
+                                <th class="px-6 py-4 text-center">Total Pendiente</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabla-reporte-pagos" class="divide-y divide-zinc-100"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- MODAL EMPLEADO -->
+    <div id="modal-empleado" class="modal-overlay hidden">
+        <div class="modal-box p-8">
+            <div class="flex justify-between items-center mb-6 border-b-2 border-zinc-100 pb-4">
+                <h3 id="modal-titulo" class="text-xl font-black uppercase italic text-zinc-900">Nuevo Empleado</h3>
+                <button onclick="cerrarModalEmpleado()" class="text-zinc-400 hover:text-red-600 text-2xl font-black">×</button>
+            </div>
+
+            <div class="space-y-6 text-zinc-900">
+                <!-- DATOS PERSONALES -->
+                <div>
+                    <h4 class="text-[10px] font-black uppercase text-blue-600 border-b border-zinc-200 pb-1 mb-3">Datos Personales</h4>
+                    <div class="grid grid-cols-2 gap-3">
+                        <input type="hidden" id="emp-id">
+                        <input type="text" id="emp-nombre" placeholder="NOMBRE COMPLETO" class="col-span-2 p-2 bg-zinc-50 border-2 border-zinc-200 font-black text-xs uppercase outline-none focus:border-blue-600">
+                        <input type="text" id="emp-cedula" placeholder="CÉDULA / ID" class="p-2 bg-zinc-50 border-2 border-zinc-200 font-black text-xs outline-none focus:border-blue-600">
+                        <input type="date" id="emp-fechaNacimiento" class="p-2 bg-zinc-50 border-2 border-zinc-200 font-black text-xs outline-none focus:border-blue-600">
+                        <input type="tel" id="emp-telefono" placeholder="TELÉFONO" class="p-2 bg-zinc-50 border-2 border-zinc-200 font-black text-xs outline-none focus:border-blue-600">
+                        <input type="email" id="emp-email" placeholder="EMAIL" class="p-2 bg-zinc-50 border-2 border-zinc-200 font-black text-xs outline-none focus:border-blue-600">
+                        <input type="text" id="emp-direccion" placeholder="DIRECCIÓN" class="p-2 bg-zinc-50 border-2 border-zinc-200 font-black text-xs outline-none focus:border-blue-600">
+                        <input type="text" id="emp-ciudad" placeholder="CIUDAD" class="p-2 bg-zinc-50 border-2 border-zinc-200 font-black text-xs outline-none focus:border-blue-600">
+                    </div>
+                </div>
+
+                <!-- INFORMACIÓN LABORAL -->
+                <div>
+                    <h4 class="text-[10px] font-black uppercase text-blue-600 border-b border-zinc-200 pb-1 mb-3">Información Laboral</h4>
+                    <div class="grid grid-cols-2 gap-3">
+                        <input type="text" id="emp-cargo" placeholder="CARGO" class="p-2 bg-zinc-50 border-2 border-zinc-200 font-black text-xs uppercase outline-none focus:border-blue-600">
+                        <input type="number" id="emp-salario" placeholder="SALARIO BASE" class="p-2 bg-zinc-50 border-2 border-zinc-200 font-black text-xs outline-none focus:border-blue-600">
+                        <input type="date" id="emp-fechaIngreso" class="p-2 bg-zinc-50 border-2 border-zinc-200 font-black text-xs outline-none focus:border-blue-600">
+                        <select id="emp-tipoContrato" class="p-2 bg-zinc-50 border-2 border-zinc-200 font-black text-xs outline-none focus:border-blue-600">
+                            <option value="">TIPO DE CONTRATO</option>
+                            <option value="INDEFINIDO">Indefinido</option>
+                            <option value="FIJO">Término Fijo</option>
+                            <option value="OBRA">Obra o Labor</option>
+                            <option value="APRENDIZAJE">Aprendizaje</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- DATOS BANCARIOS -->
+                <div>
+                    <h4 class="text-[10px] font-black uppercase text-blue-600 border-b border-zinc-200 pb-1 mb-3">Datos Bancarios</h4>
+                    <div class="grid grid-cols-2 gap-3">
+                        <select id="emp-banco" class="p-2 bg-zinc-50 border-2 border-zinc-200 font-black text-xs outline-none focus:border-blue-600">
+                            <option value="">SELECCIONAR BANCO</option>
+                            <option>BANCOLOMBIA</option>
+                            <option>DAVIVIENDA</option>
+                            <option>BANCO DE BOGOTÁ</option>
+                            <option>NEQUI</option>
+                            <option>DAVIPLATA</option>
+                            <option>BBVA</option>
+                            <option>BANCO POPULAR</option>
+                            <option>OTRO</option>
+                        </select>
+                        <select id="emp-tipoCuenta" class="p-2 bg-zinc-50 border-2 border-zinc-200 font-black text-xs outline-none focus:border-blue-600">
+                            <option value="">TIPO DE CUENTA</option>
+                            <option value="AHORROS">Ahorros</option>
+                            <option value="CORRIENTE">Corriente</option>
+                        </select>
+                        <input type="text" id="emp-numeroCuenta" placeholder="NÚMERO DE CUENTA" class="col-span-2 p-2 bg-zinc-50 border-2 border-zinc-200 font-black text-xs outline-none focus:border-blue-600">
+                    </div>
+                </div>
+
+                <!-- DOCUMENTOS -->
+                <div>
+                    <h4 class="text-[10px] font-black uppercase text-blue-600 border-b border-zinc-200 pb-1 mb-3">Documentos</h4>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="text-[9px] font-black uppercase text-zinc-500 block mb-1">Foto de Perfil</label>
+                            <input type="file" id="emp-foto" accept="image/*" class="w-full p-2 bg-zinc-50 border-2 border-zinc-200 text-xs">
+                        </div>
+                        <div>
+                            <label class="text-[9px] font-black uppercase text-zinc-500 block mb-1">Contrato (PDF)</label>
+                            <input type="file" id="emp-contrato" accept=".pdf" class="w-full p-2 bg-zinc-50 border-2 border-zinc-200 text-xs">
+                        </div>
+                    </div>
+                </div>
+
+                <div id="emp-error" class="hidden bg-red-50 border-2 border-red-200 text-red-600 text-xs font-bold uppercase p-3 rounded"></div>
+
+                <button onclick="guardarEmpleado()" class="w-full bg-zinc-900 hover:bg-blue-600 text-white font-black py-4 uppercase text-xs transition-all italic rounded">
+                    💾 Guardar Empleado
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // NAVEGACIÓN
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.add('hidden'));
+            document.querySelectorAll('.sidebar-item').forEach(b => b.classList.remove('active'));
+            document.getElementById('tab-' + tabId).classList.remove('hidden');
+            document.getElementById('btn-' + tabId).classList.add('active');
+            if (tabId === 'empleados') cargarEmpleados();
+            if (tabId === 'contabilidad') cargarResumenContabilidad();
+            if (tabId === 'pagos') cargarReportePagos();
+        }
+
+        // AUTENTICACIÓN
+        const token = localStorage.getItem('wfb_token');
+        if (token) {
+            document.getElementById('nombre-usuario').textContent = localStorage.getItem('wfb_nombre');
+            document.getElementById('rol-usuario').textContent = localStorage.getItem('wfb_rol');
+        } else {
+            // Sin token: mostrar mensaje de acceso denegado
+            document.body.innerHTML = '<div style="display:flex;flex-direction:column;gap:20px;align-items:center;justify-content:center;height:100vh;background:#000;color:#fff;font-family:Arial"><h1>⚠️ Acceso No Autorizado</h1><p>No tienes sesión activa.</p><a href="/login.html" style="padding:10px 20px;background:#2563eb;color:#fff;text-decoration:none;border-radius:5px">Ir a Login</a></div>';
+        }
+
+        function getHeaders() {
+            return { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token };
+        }
+
+        function cerrarSesion() {
+            if (confirm('¿Deseas cerrar sesión?')) { localStorage.clear(); window.location.href = '/login.html'; }
+        }
+
+        // EXCEL
+        async function descargarExcel() {
+            if (btnExportar) {
+                btnExportar.disabled = true;
+                btnExportar.textContent = 'Generando Excel...';
+            }
+            statusNomina.textContent = 'Generando Excel...';
+            try {
+                const res = await fetch('/api/exportar', { headers: { 'Authorization': 'Bearer ' + token } });
+                if (res.status === 401) { cerrarSesion(); return; }
+                if (!res.ok) {
+                    const msg = await res.text();
+                    alert('Error al descargar Excel: ' + msg);
+                    statusNomina.textContent = 'Error al generar Excel';
+                    return;
+                }
+                const blob = await res.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url; a.download = 'WFB_REPORTE_NOMINA.xlsx';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+                statusNomina.textContent = 'Excel generado correctamente';
+            } catch (error) {
+                console.error(error);
+                alert('Error en descarga: ' + (error.message || error));
+                statusNomina.textContent = 'Error al generar Excel';
+            } finally {
+                if (btnExportar) {
+                    btnExportar.disabled = false;
+                    btnExportar.textContent = estadoExcelDefault;
+                }
+                setTimeout(() => { if (statusNomina) statusNomina.textContent = ''; }, 3000);
+            }
+        }
+
+        // NÓMINA
+        const form = document.getElementById('form-nomina');
+        const tabla = document.getElementById('tabla-body');
+        const buscador = document.getElementById('buscador');
+        const selectEmpleado = document.getElementById('empleado_id');
+        const inputEmpleadoBuscar = document.getElementById('empleado_buscar');
+        const suggestionsBox = document.getElementById('dropdown-suggestions');
+        const inputNombre = document.getElementById('nombre');
+        const inputCedula = document.getElementById('cedula');
+        const inputCargo = document.getElementById('cargo');
+        const inputSalario = document.getElementById('salario');
+        const btnExportar = document.getElementById('btn-exportar-excel');
+        const btnGrabar = document.getElementById('btn-grabar-nomina');
+        const statusNomina = document.getElementById('nomina-status');
+
+        let cacheNominas = [];
+        let cacheEmpleados = [];
+        const estadoTextoDefault = btnGrabar ? btnGrabar.textContent : 'Sincronizar a DB';
+        const estadoExcelDefault = btnExportar ? btnExportar.textContent : '📥 EXPORTAR REPOSITORIO (.XLSX)';
+
+        async function cargarDatos() {
+            try {
+                const res = await fetch('/api/nominas', { headers: getHeaders() });
+                if (res.status === 401) { window.location.href = '/login.html'; return; }
+                cacheNominas = await res.json();
+                renderizar(cacheNominas);
+            } catch (err) { console.error(err); }
+        }
+
+        async function cargarEmpleadosNomina() {
+            try {
+                const res = await fetch('/api/empleados', { headers: getHeaders() });
+                if (res.status === 401) { window.location.href = '/login.html'; return; }
+                cacheEmpleados = await res.json();
+
+                // Select oculto para la lógica de envío
+                selectEmpleado.innerHTML = '<option value="">Selecciona un empleado</option>';
+
+                cacheEmpleados.forEach(emp => {
+                    const option = document.createElement('option');
+                    option.value = emp.id;
+                    option.textContent = `${emp.nombre} | CC: ${emp.cedula}`;
+                    selectEmpleado.appendChild(option);
+                });
+            } catch (err) { console.error(err); }
+        }
+
+        function renderizar(datos) {
+            tabla.innerHTML = '';
+            if (!datos.length) {
+                tabla.innerHTML = '<tr><td colspan="4" class="text-center py-8 text-zinc-400 text-xs font-bold uppercase">Sin registros</td></tr>';
+                return;
+            }
+            datos.forEach(item => {
+                const estadoPago = item.estado_pago || 'pendiente';
+                const colorEstado = estadoPago === 'pagada' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700';
+                const textEstado = estadoPago === 'pagada' ? '✓ PAGADA' : '⏳ PENDIENTE';
+                const btnPago = estadoPago === 'pagada' 
+                    ? `<button class="btn-revertir-pago bg-amber-500 text-white px-3 py-2 text-[9px] font-black uppercase hover:bg-amber-600 transition-all" data-id="${item.id}">Revertir</button>`
+                    : `<button class="btn-marcar-pagada bg-green-600 text-white px-3 py-2 text-[9px] font-black uppercase hover:bg-green-700 transition-all" data-id="${item.id}">Marcar Pagada</button>`;
+                
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td class="px-6 py-4">
+                        <div class="font-black uppercase text-sm italic text-zinc-900">${item.empleado}</div>
+                        <div class="text-[9px] text-zinc-400 font-bold uppercase">${item.cargo} | CC: ${item.identificacion}</div>
+                        <div class="text-[9px] text-zinc-400 font-bold uppercase">${item.periodo || ''} | ${item.comprobanteNo || ''}</div>
+                    </td>
+                    <td class="px-6 py-4 text-center font-black text-blue-700 text-xl">$${item.totalNeto.toLocaleString()}</td>
+                    <td class="px-6 py-4 text-center">
+                        <div class="inline-block px-3 py-1 rounded font-black text-[9px] uppercase ${colorEstado}">
+                            ${textEstado}
+                        </div>
+                        ${item.fecha_pago ? `<div class="text-[8px] text-zinc-500 mt-1">${item.fecha_pago}</div>` : ''}
+                    </td>
+                    <td class="px-6 py-4 text-right space-x-1 flex flex-wrap justify-end gap-1">
+                        <button class="btn-pdf bg-zinc-900 text-white px-3 py-2 text-[9px] font-black uppercase hover:bg-blue-600 transition-all" data-id="${item.id}">PDF</button>
+                        ${btnPago}
+                        <button onclick="eliminar(${item.id})" class="text-red-600 border-2 border-red-200 px-3 py-2 text-[9px] font-black uppercase hover:bg-red-600 hover:text-white transition-all">Eliminar</button>
+                    </td>`;
+                tabla.appendChild(row);
+            });
+            
+            document.querySelectorAll('.btn-pdf').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const id = btn.getAttribute('data-id');
+                    if (!id) return;
+                    const item = cacheNominas.find(n => String(n.id) === String(id));
+                    if (item) imprimirTicket(item);
+                    else alert('Registro no encontrado para PDF.');
+                });
+            });
+
+            document.querySelectorAll('.btn-marcar-pagada').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    const id = btn.getAttribute('data-id');
+                    await marcarNominaPagada(id, 'pagada');
+                });
+            });
+
+            document.querySelectorAll('.btn-revertir-pago').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    const id = btn.getAttribute('data-id');
+                    await marcarNominaPagada(id, 'pendiente');
+                });
+            });
+        }
+
+        buscador.addEventListener('input', e => {
+            const t = e.target.value.toUpperCase();
+            filtrarNominas();
+        });
+
+        document.getElementById('filtro-estado-pago').addEventListener('change', () => {
+            filtrarNominas();
+        });
+
+        function filtrarNominas() {
+            const textoBusqueda = buscador.value.toUpperCase();
+            const estadoFiltro = document.getElementById('filtro-estado-pago').value;
+            
+            const resultado = cacheNominas.filter(n => {
+                const cumpleTexto = n.empleado.includes(textoBusqueda) || n.identificacion.includes(textoBusqueda);
+                const cumpleEstado = !estadoFiltro || (n.estado_pago || 'pendiente') === estadoFiltro;
+                return cumpleTexto && cumpleEstado;
+            });
+            
+            renderizar(resultado);
+        }
+
+        async function marcarNominaPagada(id, estado) {
+            try {
+                const res = await fetch(`/api/nominas/${id}/pago`, {
+                    method: 'PUT',
+                    headers: getHeaders(),
+                    body: JSON.stringify({ estado_pago: estado })
+                });
+                if (res.status === 401) { window.location.href = '/login.html'; return; }
+                if (res.ok) {
+                    cargarDatos();
+                    statusNomina.textContent = `Nómina marcada como ${estado}`;
+                    setTimeout(() => { statusNomina.textContent = ''; }, 3000);
+                } else {
+                    const error = await res.json();
+                    alert('Error: ' + (error.error || 'No se pudo actualizar'));
+                }
+            } catch (err) {
+                console.error(err);
+                alert('Error al actualizar pago: ' + err.message);
+            }
+        }
+
+
+        function debounce(fn, delay) {
+            let timer;
+            return function(...args) {
+                clearTimeout(timer);
+                timer = setTimeout(() => fn.apply(this, args), delay);
+            };
+        }
+
+        let _suggestionIndex = -1;
+
+        function seleccionarEmpleado(emp) {
+            if (!emp) {
+                _suggestionIndex = -1;
+                selectEmpleado.value = '';
+                inputEmpleadoBuscar.value = '';
+                inputNombre.value = '';
+                inputCedula.value = '';
+                inputCargo.value = '';
+                inputSalario.value = '';
+                suggestionsBox.classList.add('hidden');
+                suggestionsBox.innerHTML = '';
+                return;
+            }
+            _suggestionIndex = -1;
+            selectEmpleado.value = emp.id;
+            inputEmpleadoBuscar.value = `${emp.nombre} | ${emp.cedula}`;
+            inputNombre.value = emp.nombre || '';
+            inputCedula.value = emp.cedula || '';
+            inputCargo.value = emp.cargo || '';
+            inputSalario.value = emp.salario || '';
+            suggestionsBox.classList.add('hidden');
+            suggestionsBox.innerHTML = '';
+        }
+
+        function levenshtein(a, b) {
+            const matrix = Array.from({ length: b.length + 1 }, (_, i) => [i]);
+            for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
+            for (let i = 1; i <= b.length; i++) {
+                for (let j = 1; j <= a.length; j++) {
+                    if (b[i - 1] === a[j - 1]) matrix[i][j] = matrix[i - 1][j - 1];
+                    else matrix[i][j] = Math.min(matrix[i - 1][j] + 1, matrix[i][j - 1] + 1, matrix[i - 1][j - 1] + 1);
+                }
+            }
+            return matrix[b.length][a.length];
+        }
+
+        function actualizarSugerencias(text) {
+            const q = String(text || '').trim().toLowerCase();
+            if (!q) {
+                suggestionsBox.innerHTML = '';
+                suggestionsBox.classList.add('hidden');
+                return;
+            }
+
+            const matches = cacheEmpleados
+                .map(emp => {
+                    const t = `${emp.nombre} ${emp.cedula} ${emp.cargo || ''}`.toLowerCase();
+                    const has = t.includes(q);
+                    const distance = levenshtein(q, emp.nombre.toLowerCase()) + levenshtein(q, emp.cedula.toLowerCase());
+                    return { emp, has, score: has ? 0 : distance };
+                })
+                .filter(x => x.has || x.score <= 8)
+                .sort((a, b) => a.score - b.score)
+                .slice(0, 8)
+                .map(x => x.emp);
+
+            if (!matches.length) {
+                suggestionsBox.innerHTML = '<div class="px-3 py-2 text-xs text-zinc-500">No hay coincidencias.</div>';
+                suggestionsBox.classList.remove('hidden');
+                return;
+            }
+
+            suggestionsBox.innerHTML = matches.map(emp => `
+                <div class="suggestion-item px-3 py-2 text-xs cursor-pointer hover:bg-blue-500 hover:text-white" data-id="${emp.id}">
+                    <strong>${emp.nombre}</strong> · ${emp.cedula} · ${emp.cargo || '—'}
+                </div>
+            `).join('');
+            suggestionsBox.classList.remove('hidden');
+
+            suggestionsBox.querySelectorAll('.suggestion-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    const selectedId = item.getAttribute('data-id');
+                    const emp = cacheEmpleados.find(e => String(e.id) === String(selectedId));
+                    if (emp) seleccionarEmpleado(emp);
+                });
+            });
+        }
+
+        function setActiveSuggestion(index) {
+            const items = suggestionsBox.querySelectorAll('.suggestion-item');
+            if (!items.length) return;
+            items.forEach(el => el.classList.remove('selected'));
+            if (index < 0) {
+                _suggestionIndex = -1;
+                return;
+            }
+            if (index >= items.length) index = items.length - 1;
+            if (index < 0) index = 0;
+            _suggestionIndex = index;
+            const active = items[index];
+            active.classList.add('selected');
+            active.scrollIntoView({ block: 'nearest' });
+        }
+
+        selectEmpleado.addEventListener('change', e => {
+            const id = e.target.value;
+            const emp = cacheEmpleados.find(x => String(x.id) === String(id));
+            seleccionarEmpleado(emp);
+        });
+
+        inputEmpleadoBuscar.addEventListener('keydown', e => {
+            const items = suggestionsBox.querySelectorAll('.suggestion-item');
+            if (!items.length) return;
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                setActiveSuggestion(_suggestionIndex + 1);
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                setActiveSuggestion(_suggestionIndex - 1);
+            } else if (e.key === 'Enter' || e.key === 'Tab') {
+                if (_suggestionIndex >= 0 && _suggestionIndex < items.length) {
+                    e.preventDefault();
+                    const id = items[_suggestionIndex].getAttribute('data-id');
+                    const emp = cacheEmpleados.find(x => String(x.id) === String(id));
+                    if (emp) seleccionarEmpleado(emp);
+                }
+            } else if (e.key === 'Escape') {
+                suggestionsBox.classList.add('hidden');
+            }
+        });
+
+        const debouncedActualizarSugerencias = debounce(text => {
+            actualizarSugerencias(text);
+            const exact = cacheEmpleados.find(x => `${x.nombre} | ${x.cedula}`.toLowerCase() === text.toLowerCase() || x.nombre.toLowerCase() === text.toLowerCase() || x.cedula === text);
+            if (exact) seleccionarEmpleado(exact);
+        }, 120);
+
+        inputEmpleadoBuscar.addEventListener('input', e => {
+            const text = e.target.value;
+            debouncedActualizarSugerencias(text);
+        });
+
+        inputEmpleadoBuscar.addEventListener('focus', () => {
+            if (inputEmpleadoBuscar.value.trim()) actualizarSugerencias(inputEmpleadoBuscar.value);
+        });
+
+        inputEmpleadoBuscar.addEventListener('blur', () => {
+            setTimeout(() => {
+                suggestionsBox.classList.add('hidden');
+            }, 150);
+        });
+
+        form.addEventListener('submit', async e => {
+            e.preventDefault();
+            if (!selectEmpleado.value) {
+                alert('Por favor selecciona un empleado.');
+                return;
+            }
+            if (btnGrabar) {
+                btnGrabar.disabled = true;
+                btnGrabar.textContent = 'Guardando...';
+            }
+            statusNomina.textContent = 'Guardando nómina...';
+
+            const data = {
+                empleado_id: parseInt(selectEmpleado.value),
+                cargo: inputCargo.value,
+                salarioBase: parseFloat(inputSalario.value),
+                dias: parseInt(document.getElementById('dias').value),
+                periodo: document.getElementById('periodo').value
+            };
+
+            try {
+                const res = await fetch('/api/nominas', { method: 'POST', headers: getHeaders(), body: JSON.stringify(data) });
+                if (res.status === 401) { window.location.href = '/login.html'; return; }
+                if (!res.ok) {
+                    const error = await res.json();
+                    alert('Error guardando nómina: ' + (error.error || res.statusText));
+                    statusNomina.textContent = 'Error al guardar nómina';
+                    return;
+                }
+                statusNomina.textContent = 'Nómina guardada correctamente';
+                form.reset();
+                document.getElementById('dias').value = '30';
+                inputCargo.value = '';
+                inputSalario.value = '';
+                cargarDatos();
+            } catch (error) {
+                console.error(error);
+                alert('Error guardando nómina: ' + (error.message || error));
+                statusNomina.textContent = 'Error al guardar nómina';
+            } finally {
+                if (btnGrabar) {
+                    btnGrabar.disabled = false;
+                    btnGrabar.textContent = estadoTextoDefault;
+                }
+                setTimeout(() => { if (statusNomina) statusNomina.textContent = ''; }, 3000);
+            }
+        });
+
+        async function eliminar(id) {
+            if (confirm("¿Desea borrar este registro?")) {
+                await fetch('/api/nominas/' + id, { method: 'DELETE', headers: getHeaders() });
+                cargarDatos();
+            }
+        }
+
+        // SEGURIDAD SOCIAL
+        async function calcularSeguridadSocial() {
+            try {
+                const res = await fetch('/api/nominas', { headers: getHeaders() });
+                if (res.status === 401) { window.location.href = '/login.html'; return; }
+                const nominas = await res.json();
+
+                const porcSaludEmp = parseFloat(document.getElementById('porc-salud-emp').value) / 100;
+                const porcPensionEmp = parseFloat(document.getElementById('porc-pension-emp').value) / 100;
+                const porcArl = parseFloat(document.getElementById('porc-arl').value) / 100;
+                const porcCaja = parseFloat(document.getElementById('porc-caja').value) / 100;
+                const porcSena = parseFloat(document.getElementById('porc-sena').value) / 100;
+                const porcIcbf = parseFloat(document.getElementById('porc-icbf').value) / 100;
+
+                let totalSaludEmp = 0;
+                let totalPensionEmp = 0;
+                let totalArl = 0;
+                let totalCaja = 0;
+                let totalSena = 0;
+                let totalIcbf = 0;
+
+                const tabla = document.getElementById('tabla-seguridad');
+                tabla.innerHTML = '';
+
+                nominas.forEach(nomina => {
+                    const ibc = parseFloat(nomina.salarioContrato);
+                    const saludEmp = Math.round(ibc * porcSaludEmp);
+                    const pensionEmp = Math.round(ibc * porcPensionEmp);
+                    const arl = Math.round(ibc * porcArl);
+                    const caja = Math.round(ibc * porcCaja);
+                    const sena = Math.round(ibc * porcSena);
+                    const icbf = Math.round(ibc * porcIcbf);
+                    const total = saludEmp + pensionEmp + arl + caja + sena + icbf;
+
+                    totalSaludEmp += saludEmp;
+                    totalPensionEmp += pensionEmp;
+                    totalArl += arl;
+                    totalCaja += caja;
+                    totalSena += sena;
+                    totalIcbf += icbf;
+
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td class="px-6 py-4">
+                            <div class="font-black uppercase text-sm italic text-zinc-900">${nomina.empleado}</div>
+                            <div class="text-[9px] text-zinc-400 font-bold uppercase">${nomina.cargo}</div>
+                        </td>
+                        <td class="px-6 py-4 text-center font-bold text-zinc-700">$${ibc.toLocaleString()}</td>
+                        <td class="px-6 py-4 text-center font-bold text-blue-600">$${saludEmp.toLocaleString()}</td>
+                        <td class="px-6 py-4 text-center font-bold text-blue-600">$${pensionEmp.toLocaleString()}</td>
+                        <td class="px-6 py-4 text-center font-bold text-blue-600">$${arl.toLocaleString()}</td>
+                        <td class="px-6 py-4 text-center font-bold text-blue-600">$${caja.toLocaleString()}</td>
+                        <td class="px-6 py-4 text-center font-bold text-blue-600">$${sena.toLocaleString()}</td>
+                        <td class="px-6 py-4 text-center font-bold text-blue-600">$${icbf.toLocaleString()}</td>
+                        <td class="px-6 py-4 text-center font-black text-red-600">$${total.toLocaleString()}</td>
+                    `;
+                    tabla.appendChild(row);
+                });
+
+                document.getElementById('total-salud-emp').textContent = `$${totalSaludEmp.toLocaleString()}`;
+                document.getElementById('total-pension-emp').textContent = `$${totalPensionEmp.toLocaleString()}`;
+                document.getElementById('total-arl').textContent = `$${totalArl.toLocaleString()}`;
+                document.getElementById('total-caja').textContent = `$${totalCaja.toLocaleString()}`;
+                document.getElementById('total-sena').textContent = `$${totalSena.toLocaleString()}`;
+                document.getElementById('total-icbf').textContent = `$${totalIcbf.toLocaleString()}`;
+                document.getElementById('total-general').textContent = `$${(totalSaludEmp + totalPensionEmp + totalArl + totalCaja + totalSena + totalIcbf).toLocaleString()}`;
+
+            } catch (err) {
+                console.error('Error calculando seguridad social:', err);
+                alert('Error al calcular aportes de seguridad social.');
+            }
+        }
+
+        // CONTABILIDAD (PUC)
+        async function generarAsientosContables() {
+            try {
+                const res = await fetch('/api/nominas', { headers: getHeaders() });
+                if (res.status === 401) { window.location.href = '/login.html'; return; }
+                const nominas = await res.json();
+
+                // Obtener cuentas PUC configuradas
+                const cuentas = {
+                    sueldos: document.getElementById('cuenta-sueldos').value,
+                    auxilio: document.getElementById('cuenta-auxilio').value,
+                    salud: document.getElementById('cuenta-salud').value,
+                    pension: document.getElementById('cuenta-pension').value,
+                    arl: document.getElementById('cuenta-arl').value,
+                    caja: document.getElementById('cuenta-caja').value,
+                    sena: document.getElementById('cuenta-sena').value,
+                    icbf: document.getElementById('cuenta-icbf').value,
+                    obligaciones: document.getElementById('cuenta-obligaciones').value
+                };
+
+                // Calcular porcentajes de seguridad social (igual que en el módulo anterior)
+                const porcSaludEmp = 0.085; // 8.5%
+                const porcPensionEmp = 0.12; // 12%
+                const porcArl = 0.00522; // 0.522%
+                const porcCaja = 0.04; // 4%
+                const porcSena = 0.02; // 2%
+                const porcIcbf = 0.03; // 3%
+
+                let totalDebitos = 0;
+                let totalCreditos = 0;
+                const asientos = [];
+
+                // Limpiar tablas
+                document.getElementById('tabla-asientos').innerHTML = '';
+                document.getElementById('tabla-detalle-contable').innerHTML = '';
+
+                // Procesar cada nómina
+                nominas.forEach(nomina => {
+                    const ibc = parseFloat(nomina.salarioContrato);
+                    const sueldoDevengado = parseFloat(nomina.sueldoDevengado);
+                    const auxTransporte = parseFloat(nomina.auxTransporte);
+                    const totalNeto = parseFloat(nomina.totalNeto);
+
+                    // Cálculos de aportes empleador
+                    const saludEmp = Math.round(ibc * porcSaludEmp);
+                    const pensionEmp = Math.round(ibc * porcPensionEmp);
+                    const arl = Math.round(ibc * porcArl);
+                    const caja = Math.round(ibc * porcCaja);
+                    const sena = Math.round(ibc * porcSena);
+                    const icbf = Math.round(ibc * porcIcbf);
+
+                    // Agregar fila al detalle por empleado
+                    const rowDetalle = document.createElement('tr');
+                    rowDetalle.innerHTML = `
+                        <td class="px-6 py-4">
+                            <div class="font-black uppercase text-sm italic text-zinc-900">${nomina.empleado}</div>
+                            <div class="text-[9px] text-zinc-400 font-bold uppercase">${nomina.cargo}</div>
+                        </td>
+                        <td class="px-6 py-4 text-center font-bold text-zinc-700">$${sueldoDevengado.toLocaleString()}</td>
+                        <td class="px-6 py-4 text-center font-bold text-zinc-700">$${auxTransporte.toLocaleString()}</td>
+                        <td class="px-6 py-4 text-center font-bold text-blue-600">$${saludEmp.toLocaleString()}</td>
+                        <td class="px-6 py-4 text-center font-bold text-blue-600">$${pensionEmp.toLocaleString()}</td>
+                        <td class="px-6 py-4 text-center font-bold text-blue-600">$${arl.toLocaleString()}</td>
+                        <td class="px-6 py-4 text-center font-bold text-blue-600">$${caja.toLocaleString()}</td>
+                        <td class="px-6 py-4 text-center font-bold text-blue-600">$${sena.toLocaleString()}</td>
+                        <td class="px-6 py-4 text-center font-bold text-blue-600">$${icbf.toLocaleString()}</td>
+                        <td class="px-6 py-4 text-center font-black text-red-600">$${totalNeto.toLocaleString()}</td>
+                    `;
+                    document.getElementById('tabla-detalle-contable').appendChild(rowDetalle);
+                });
+
+                // Calcular totales para asientos contables
+                const totalSueldos = nominas.reduce((sum, n) => sum + parseFloat(n.sueldoDevengado), 0);
+                const totalAuxilio = nominas.reduce((sum, n) => sum + parseFloat(n.auxTransporte), 0);
+                const totalSaludEmp = nominas.reduce((sum, n) => sum + Math.round(parseFloat(n.salarioContrato) * porcSaludEmp), 0);
+                const totalPensionEmp = nominas.reduce((sum, n) => sum + Math.round(parseFloat(n.salarioContrato) * porcPensionEmp), 0);
+                const totalArl = nominas.reduce((sum, n) => sum + Math.round(parseFloat(n.salarioContrato) * porcArl), 0);
+                const totalCaja = nominas.reduce((sum, n) => sum + Math.round(parseFloat(n.salarioContrato) * porcCaja), 0);
+                const totalSena = nominas.reduce((sum, n) => sum + Math.round(parseFloat(n.salarioContrato) * porcSena), 0);
+                const totalIcbf = nominas.reduce((sum, n) => sum + Math.round(parseFloat(n.salarioContrato) * porcIcbf), 0);
+                const totalNetoEmpleados = nominas.reduce((sum, n) => sum + parseFloat(n.totalNeto), 0);
+
+                // Crear asientos contables
+                const asientosData = [
+                    { cuenta: cuentas.sueldos, descripcion: 'SUELDOS Y SALARIOS', debito: totalSueldos, credito: 0 },
+                    { cuenta: cuentas.auxilio, descripcion: 'AUXILIO DE TRANSPORTE', debito: totalAuxilio, credito: 0 },
+                    { cuenta: cuentas.salud, descripcion: 'APORTES SALUD EMPLEADOR', debito: totalSaludEmp, credito: 0 },
+                    { cuenta: cuentas.pension, descripcion: 'APORTES PENSIÓN EMPLEADOR', debito: totalPensionEmp, credito: 0 },
+                    { cuenta: cuentas.arl, descripcion: 'RIESGOS LABORALES (ARL)', debito: totalArl, credito: 0 },
+                    { cuenta: cuentas.caja, descripcion: 'CAJA DE COMPENSACIÓN FAMILIAR', debito: totalCaja, credito: 0 },
+                    { cuenta: cuentas.sena, descripcion: 'SERVICIO NACIONAL DE APRENDIZAJE (SENA)', debito: totalSena, credito: 0 },
+                    { cuenta: cuentas.icbf, descripcion: 'INSTITUTO COLOMBIANO DE BIENESTAR FAMILIAR (ICBF)', debito: totalIcbf, credito: 0 },
+                    { cuenta: cuentas.obligaciones, descripcion: 'OBLIGACIONES LABORALES Y PRESTACIONES SOCIALES', debito: 0, credito: totalNetoEmpleados }
+                ];
+
+                // Agregar asientos a la tabla
+                asientosData.forEach(asiento => {
+                    if (asiento.debito > 0 || asiento.credito > 0) {
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td class="px-4 py-3 font-bold text-zinc-900">${asiento.cuenta}</td>
+                            <td class="px-4 py-3 text-zinc-700">${asiento.descripcion}</td>
+                            <td class="px-4 py-3 text-center font-bold text-red-600">${asiento.debito > 0 ? '$' + asiento.debito.toLocaleString() : ''}</td>
+                            <td class="px-4 py-3 text-center font-bold text-blue-600">${asiento.credito > 0 ? '$' + asiento.credito.toLocaleString() : ''}</td>
+                        `;
+                        document.getElementById('tabla-asientos').appendChild(row);
+                        totalDebitos += asiento.debito;
+                        totalCreditos += asiento.credito;
+                    }
+                });
+
+                // Actualizar totales
+                document.getElementById('total-debitos').textContent = `$${totalDebitos.toLocaleString()}`;
+                document.getElementById('total-creditos').textContent = `$${totalCreditos.toLocaleString()}`;
+
+                // Cargar resumen contabilidad cruzado empleados + nominas
+                await cargarResumenContabilidad();
+
+            } catch (err) {
+                console.error('Error generando asientos contables:', err);
+                alert('Error al generar asientos contables.');
+            }
+        }
+
+        async function cargarResumenContabilidad() {
+            try {
+                const res = await fetch('/api/contabilidad/resumen', { headers: getHeaders() });
+                if (res.status === 401) { window.location.href = '/login.html'; return; }
+                const resumen = await res.json();
+                const cuerpo = document.getElementById('tabla-detalle-contable');
+                cuerpo.innerHTML = '';
+
+                if (!resumen.length) {
+                    cuerpo.innerHTML = '<tr><td colspan="10" class="text-center py-8 text-zinc-400 text-xs font-bold uppercase">Sin datos de contabilidad</td></tr>';
+                    return;
+                }
+
+                resumen.forEach(emp => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td class="px-6 py-4">
+                            <div class="font-black uppercase text-sm italic text-zinc-900">${emp.nombre || '—'}</div>
+                            <div class="text-[9px] text-zinc-400 font-bold uppercase">CC: ${emp.cedula || '—'}</div>
+                            <div class="text-[9px] text-zinc-400 font-bold uppercase">${emp.cargo || '—'}</div>
+                        </td>
+                        <td class="px-6 py-4 text-center font-bold text-zinc-700">$${Number(emp.totalSueldoDevengado).toLocaleString()}</td>
+                        <td class="px-6 py-4 text-center font-bold text-zinc-700">$${Number(emp.totalAuxTransporte).toLocaleString()}</td>
+                        <td class="px-6 py-4 text-center font-bold text-blue-600">$${Number(emp.totalSalud).toLocaleString()}</td>
+                        <td class="px-6 py-4 text-center font-bold text-blue-600">$${Number(emp.totalPension).toLocaleString()}</td>
+                        <td class="px-6 py-4 text-center font-bold text-blue-600">—</td>
+                        <td class="px-6 py-4 text-center font-bold text-blue-600">—</td>
+                        <td class="px-6 py-4 text-center font-bold text-blue-600">—</td>
+                        <td class="px-6 py-4 text-center font-black text-red-600">$${Number(emp.totalNeto).toLocaleString()}</td>
+                    `;
+                    cuerpo.appendChild(row);
+                });
+
+            } catch (err) {
+                console.error('Error cargando resumen contabilidad:', err);
+            }
+        }
+
+        // MÓDULO PAGOS
+        async function cargarReportePagos() {
+            try {
+                const res = await fetch('/api/pagos/reporte', { headers: getHeaders() });
+                if (res.status === 401) { window.location.href = '/login.html'; return; }
+                const reporte = await res.json();
+                const tbody = document.getElementById('tabla-reporte-pagos');
+                tbody.innerHTML = '';
+
+                let totalPagado = 0;
+                let totalPendiente = 0;
+                let countPagadas = 0;
+                let countPendientes = 0;
+
+                if (!reporte.length) {
+                    tbody.innerHTML = '<tr><td colspan="7" class="text-center py-8 text-zinc-400 text-xs font-bold uppercase">Sin datos de pagos</td></tr>';
+                    document.getElementById('total-pagado-resumen').textContent = '$0';
+                    document.getElementById('total-pendiente-resumen').textContent = '$0';
+                    document.getElementById('count-pagadas-resumen').textContent = '0';
+                    document.getElementById('count-pendientes-resumen').textContent = '0';
+                    return;
+                }
+
+                reporte.forEach(emp => {
+                    totalPagado += parseFloat(emp.totalPagado || 0);
+                    totalPendiente += parseFloat(emp.totalPendiente || 0);
+                    countPagadas += parseInt(emp.nominasPagadas || 0);
+                    countPendientes += parseInt(emp.nominasPendientes || 0);
+
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td class="px-6 py-4">
+                            <div class="font-black uppercase text-sm italic text-zinc-900">${emp.nombre || '—'}</div>
+                            <div class="text-[9px] text-zinc-400 font-bold">${emp.email || '—'}</div>
+                        </td>
+                        <td class="px-6 py-4 text-center font-bold text-zinc-700">${emp.cedula || '—'}</td>
+                        <td class="px-6 py-4 text-center font-bold text-zinc-700">${emp.cargo || '—'}</td>
+                        <td class="px-6 py-4 text-center font-black text-green-600">${emp.nominasPagadas || 0}</td>
+                        <td class="px-6 py-4 text-center font-black text-orange-600">${emp.nominasPendientes || 0}</td>
+                        <td class="px-6 py-4 text-center font-bold text-green-700">$${Number(emp.totalPagado).toLocaleString()}</td>
+                        <td class="px-6 py-4 text-center font-bold text-red-700">$${Number(emp.totalPendiente).toLocaleString()}</td>
+                    `;
+                    tbody.appendChild(row);
+                });
+
+                document.getElementById('total-pagado-resumen').textContent = `$${totalPagado.toLocaleString()}`;
+                document.getElementById('total-pendiente-resumen').textContent = `$${totalPendiente.toLocaleString()}`;
+                document.getElementById('count-pagadas-resumen').textContent = countPagadas;
+                document.getElementById('count-pendientes-resumen').textContent = countPendientes;
+
+            } catch (err) {
+                console.error('Error cargando reporte pagos:', err);
+            }
+        }
+
+        async function exportarReportePagos() {
+            const btnE = document.getElementById('btn-exportar-pagos');
+            if (btnE) btnE.disabled = true;
+            try {
+                const res = await fetch('/api/pagos/exportar', { headers: { 'Authorization': 'Bearer ' + token } });
+                if (res.status === 401) { window.location.href = '/login.html'; return; }
+                if (!res.ok) {
+                    alert('Error al descargar reporte de pagos');
+                    return;
+                }
+                const blob = await res.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'WFB_REPORTE_PAGOS.xlsx';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+            } catch (error) {
+                console.error(error);
+                alert('Error en descarga: ' + error.message);
+            } finally {
+                if (btnE) btnE.disabled = false;
+            }
+        }
+
+        // MÓDULO EMPLEADOS
+        let modoEdicion = false;
+
+        async function cargarEmpleados() {
+            const res = await fetch('/api/empleados', { headers: getHeaders() });
+            cacheEmpleados = await res.json();
+            renderizarEmpleados(cacheEmpleados);
+        }
+
+        function renderizarEmpleados(datos) {
+            const tbody = document.getElementById('tabla-empleados');
+            tbody.innerHTML = '';
+            if (!datos.length) {
+                tbody.innerHTML = '<tr><td colspan="5" class="text-center py-8 text-zinc-400 text-xs font-bold uppercase">Sin empleados registrados</td></tr>';
+                return;
+            }
+            datos.forEach(emp => {
+                const fotoSrc = emp.foto ? `/uploads/${emp.foto}` : `https://ui-avatars.com/api/?name=${encodeURIComponent(emp.nombre)}&background=09090b&color=fff&bold=true&size=40`;
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td class="px-4 py-3">
+                        <div class="flex items-center gap-3">
+                            <img src="${fotoSrc}" class="w-10 h-10 rounded-full object-cover border-2 border-zinc-900">
+                            <div>
+                                <div class="font-black uppercase text-xs text-zinc-900">${emp.nombre}</div>
+                                <div class="text-[9px] text-zinc-400 font-bold">CC: ${emp.cedula}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-4 py-3">
+                        <div class="text-[10px] font-bold text-zinc-700">${emp.telefono || '—'}</div>
+                        <div class="text-[9px] text-zinc-400">${emp.email || '—'}</div>
+                    </td>
+                    <td class="px-4 py-3">
+                        <div class="text-[10px] font-black uppercase text-zinc-900">${emp.cargo || '—'}</div>
+                        <div class="text-[9px] text-blue-600 font-bold">$${emp.salario ? Number(emp.salario).toLocaleString() : '—'}</div>
+                    </td>
+                    <td class="px-4 py-3">
+                        <div class="text-[10px] font-bold text-zinc-700">${emp.banco || '—'}</div>
+                        <div class="text-[9px] text-zinc-400">${emp.tipoCuenta || ''} ${emp.numeroCuenta || ''}</div>
+                    </td>
+                    <td class="px-4 py-3 text-right">
+                        <button onclick='editarEmpleado(${JSON.stringify(emp)})' class="bg-blue-600 text-white px-3 py-1 text-[9px] font-black uppercase hover:bg-blue-700 transition-all rounded mr-1">Editar</button>
+                        <button onclick="eliminarEmpleado(${emp.id})" class="text-red-600 border-2 border-red-200 px-3 py-1 text-[9px] font-black uppercase hover:bg-red-600 hover:text-white transition-all rounded">Baja</button>
+                    </td>`;
+                tbody.appendChild(row);
+            });
+        }
+
+        function filtrarEmpleados(val) {
+            const t = val.toUpperCase();
+            renderizarEmpleados(cacheEmpleados.filter(e => e.nombre.includes(t) || e.cedula.includes(t)));
+        }
+
+        function abrirModalEmpleado() {
+            modoEdicion = false;
+            document.getElementById('modal-titulo').textContent = 'Nuevo Empleado';
+            document.getElementById('emp-id').value = '';
+            ['nombre','cedula','telefono','email','direccion','ciudad','fechaNacimiento','cargo','salario','fechaIngreso','tipoContrato','banco','tipoCuenta','numeroCuenta'].forEach(f => {
+                const el = document.getElementById('emp-' + f);
+                if (el) el.value = '';
+            });
+            document.getElementById('emp-error').classList.add('hidden');
+            document.getElementById('modal-empleado').classList.remove('hidden');
+        }
+
+        function editarEmpleado(emp) {
+            modoEdicion = true;
+            document.getElementById('modal-titulo').textContent = 'Editar Empleado';
+            document.getElementById('emp-id').value = emp.id;
+            document.getElementById('emp-nombre').value = emp.nombre || '';
+            document.getElementById('emp-cedula').value = emp.cedula || '';
+            document.getElementById('emp-telefono').value = emp.telefono || '';
+            document.getElementById('emp-email').value = emp.email || '';
+            document.getElementById('emp-direccion').value = emp.direccion || '';
+            document.getElementById('emp-ciudad').value = emp.ciudad || '';
+            document.getElementById('emp-fechaNacimiento').value = emp.fechaNacimiento || '';
+            document.getElementById('emp-cargo').value = emp.cargo || '';
+            document.getElementById('emp-salario').value = emp.salario || '';
+            document.getElementById('emp-fechaIngreso').value = emp.fechaIngreso || '';
+            document.getElementById('emp-tipoContrato').value = emp.tipoContrato || '';
+            document.getElementById('emp-banco').value = emp.banco || '';
+            document.getElementById('emp-tipoCuenta').value = emp.tipoCuenta || '';
+            document.getElementById('emp-numeroCuenta').value = emp.numeroCuenta || '';
+            document.getElementById('emp-error').classList.add('hidden');
+            document.getElementById('modal-empleado').classList.remove('hidden');
+        }
+
+        function cerrarModalEmpleado() {
+            document.getElementById('modal-empleado').classList.add('hidden');
+        }
+
+        async function guardarEmpleado() {
+            const id = document.getElementById('emp-id').value;
+            const formData = new FormData();
+            const campos = ['nombre','cedula','telefono','email','direccion','ciudad','fechaNacimiento','cargo','salario','fechaIngreso','tipoContrato','banco','tipoCuenta','numeroCuenta'];
+            campos.forEach(f => formData.append(f, document.getElementById('emp-' + f).value));
+
+            const foto = document.getElementById('emp-foto').files[0];
+            const contrato = document.getElementById('emp-contrato').files[0];
+            if (foto) formData.append('foto', foto);
+            if (contrato) formData.append('contrato', contrato);
+
+            const url = modoEdicion ? `/api/empleados/${id}` : '/api/empleados';
+            const method = modoEdicion ? 'PUT' : 'POST';
+
+            try {
+                const res = await fetch(url, {
+                    method,
+                    headers: { 'Authorization': 'Bearer ' + token },
+                    body: formData
+                });
+                const data = await res.json();
+                if (data.success) {
+                    cerrarModalEmpleado();
+                    cargarEmpleados();
+                } else {
+                    const errEl = document.getElementById('emp-error');
+                    errEl.textContent = data.error || 'Error al guardar.';
+                    errEl.classList.remove('hidden');
+                }
+            } catch(e) { console.error(e); }
+        }
+
+        async function eliminarEmpleado(id) {
+            if (confirm("¿Dar de baja a este empleado?")) {
+                await fetch('/api/empleados/' + id, { method: 'DELETE', headers: getHeaders() });
+                cargarEmpleados();
+            }
+        }
+
+        // PDF PROFESIONAL
+        function imprimirTicket(i) {
+            const fecha = new Date().toLocaleDateString('es-CO', { year:'numeric', month:'long', day:'numeric' });
+            const win = window.open('', '_blank');
+            win.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>WFB - ${i.empleado}</title>
+<style>*{margin:0;padding:0;box-sizing:border-box;}body{font-family:Arial,sans-serif;padding:40px;color:#111;font-size:12px;}.header{text-align:center;border-bottom:3px solid #111;padding-bottom:16px;margin-bottom:20px;}.header h1{font-size:22px;font-weight:900;letter-spacing:-1px;text-transform:uppercase;}.header p{font-size:10px;color:#555;text-transform:uppercase;letter-spacing:1px;}.comprobante{font-size:10px;color:#888;text-align:right;margin-bottom:16px;}.info-empleado{background:#f5f5f5;padding:12px 16px;margin-bottom:20px;border-left:4px solid #111;}.info-empleado h2{font-size:14px;font-weight:900;text-transform:uppercase;}.info-empleado p{font-size:10px;color:#555;text-transform:uppercase;margin-top:2px;}table{width:100%;border-collapse:collapse;margin-bottom:20px;}thead tr{background:#111;color:white;}thead th{padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;}tbody tr:nth-child(even){background:#f9f9f9;}tbody td{padding:8px 12px;font-size:11px;border-bottom:1px solid #eee;}.monto{text-align:right;font-weight:bold;}.deduccion{color:#cc0000;}.total-row{background:#111!important;color:white;}.total-row td{padding:12px;font-size:13px;font-weight:900;text-transform:uppercase;}.firmas{display:flex;justify-content:space-between;margin-top:40px;}.firma{text-align:center;width:45%;}.firma-linea{border-top:1px solid #111;padding-top:8px;font-size:10px;text-transform:uppercase;color:#555;}.footer{text-align:center;margin-top:24px;font-size:9px;color:#aaa;text-transform:uppercase;}</style></head><body>
+<div class="header"><h1>WFB Originals *² — Comprobante de Nómina</h1><p>Bello, Antioquia | Sistema Administrativo</p></div>
+<div class="comprobante"><strong>No. Comprobante:</strong> ${i.comprobanteNo||'N/A'} &nbsp;|&nbsp; <strong>Fecha:</strong> ${fecha} &nbsp;|&nbsp; <strong>Período:</strong> ${i.periodo||'N/A'}</div>
+<div class="info-empleado"><h2>${i.empleado}</h2><p>CC: ${i.identificacion} &nbsp;|&nbsp; Cargo: ${i.cargo}</p><p>Días laborados: ${i.dias} &nbsp;|&nbsp; Salario contrato: $${Number(i.salarioContrato).toLocaleString()}</p></div>
+<table><thead><tr><th>Concepto</th><th style="text-align:right">Devengado</th><th style="text-align:right">Deducción</th></tr></thead>
+<tbody>
+<tr><td>Sueldo Básico</td><td class="monto">$${Number(i.sueldoDevengado).toLocaleString()}</td><td class="monto">—</td></tr>
+<tr><td>Auxilio de Transporte</td><td class="monto">$${Number(i.auxTransporte).toLocaleString()}</td><td class="monto">—</td></tr>
+<tr><td>Salud (4%)</td><td class="monto">—</td><td class="monto deduccion">-$${Number(i.salud).toLocaleString()}</td></tr>
+<tr><td>Pensión (4%)</td><td class="monto">—</td><td class="monto deduccion">-$${Number(i.pension).toLocaleString()}</td></tr>
+<tr class="total-row"><td>Total Neto Recibido</td><td class="monto" colspan="2" style="text-align:right">$${Number(i.totalNeto).toLocaleString()}</td></tr>
+</tbody></table>
+<div class="firmas"><div class="firma"><div style="height:40px"></div><div class="firma-linea">Firma Empleador</div></div><div class="firma"><div style="height:40px"></div><div class="firma-linea">Firma Trabajador</div></div></div>
+<div class="footer">WFB Nómina *² | Bello, Antioquia | Generado el ${fecha}</div>
+<script>window.onload=function(){window.print();}<\/script></body></html>`);
+            win.document.close();
+        }
+
+        // INICIALIZACIÓN CON SPLASH MEJORADO
+        const splashTimeout = setTimeout(() => {
+            const splash = document.getElementById('splash-loading');
+            if (splash) {
+                splash.style.opacity = '0';
+                splash.style.pointerEvents = 'none';
+            }
+        }, 3000);
+
+        Promise.all([
+            cargarEmpleadosNomina(),
+            cargarDatos()
+        ]).then(() => {
+            clearTimeout(splashTimeout);
+            const splash = document.getElementById('splash-loading');
+            if (splash) {
+                splash.style.transition = 'opacity 0.3s ease-out';
+                splash.style.opacity = '0';
+                splash.style.pointerEvents = 'none';
+            }
+        }).catch(err => {
+            console.error('Error cargando datos:', err);
+            clearTimeout(splashTimeout);
+            const splash = document.getElementById('splash-loading');
+            if (splash) {
+                splash.style.opacity = '0';
+                splash.style.pointerEvents = 'none';
+            }
+        });
+    </script>
+</body>
+</html>

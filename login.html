@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WFB NÓMINA *² | Iniciar Sesión</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #0c0c0c; }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+    <div class="w-full max-w-md">
+        <div class="bg-zinc-900 p-8 rounded-xl border-4 border-zinc-800 shadow-[8px_8px_0px_0px_rgba(37,99,235,1)]">
+            <div class="text-center mb-8">
+                <h1 class="text-3xl font-black italic uppercase tracking-tighter text-white">WFB NÓMINA <span class="text-blue-500">*²</span></h1>
+                <p class="text-[10px] font-bold uppercase text-zinc-500 mt-1">Bello, Antioquia | Sistema Administrativo</p>
+                <div class="w-16 h-1 bg-blue-600 mx-auto mt-3"></div>
+            </div>
+
+            <div id="error-msg" class="hidden bg-red-900 border border-red-600 text-red-200 text-xs font-bold uppercase p-3 rounded mb-4"></div>
+
+            <div class="space-y-4">
+                <div>
+                    <label class="text-[10px] font-black uppercase text-zinc-400 block mb-1">Usuario</label>
+                    <input type="text" id="usuario" placeholder="Ingresa tu usuario"
+                        class="w-full p-3 bg-zinc-800 border-2 border-zinc-700 text-white font-bold text-sm outline-none focus:border-blue-600 rounded transition-all"
+                        onkeydown="if(event.key==='Enter') login()">
+                </div>
+                <div>
+                    <label class="text-[10px] font-black uppercase text-zinc-400 block mb-1">Contraseña</label>
+                    <input type="password" id="password" placeholder="Ingresa tu contraseña"
+                        class="w-full p-3 bg-zinc-800 border-2 border-zinc-700 text-white font-bold text-sm outline-none focus:border-blue-600 rounded transition-all"
+                        onkeydown="if(event.key==='Enter') login()">
+                </div>
+                <button onclick="login()" id="btn-login"
+                    class="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-4 uppercase text-xs transition-all rounded italic mt-2">
+                    🔐 Iniciar Sesión
+                </button>
+            </div>
+
+            <p class="text-center text-zinc-600 text-[9px] uppercase font-bold mt-6">WFB Originals *² © 2026</p>
+        </div>
+    </div>
+
+    <script>
+        async function login() {
+            const usuario = document.getElementById('usuario').value.trim();
+            const password = document.getElementById('password').value;
+            const btn = document.getElementById('btn-login');
+            const errorMsg = document.getElementById('error-msg');
+
+            if (!usuario || !password) {
+                mostrarError('Completa todos los campos.');
+                return;
+            }
+
+            btn.textContent = 'Verificando...';
+            btn.disabled = true;
+            errorMsg.classList.add('hidden');
+
+            try {
+                const res = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ usuario, password })
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    localStorage.setItem('wfb_token', data.token);
+                    localStorage.setItem('wfb_nombre', data.nombre);
+                    localStorage.setItem('wfb_rol', data.rol);
+                    window.location.href = '/index.html';
+                } else {
+                    mostrarError(data.error || 'Credenciales incorrectas.');
+                }
+            } catch (e) {
+                mostrarError('Error de conexión con el servidor.');
+            } finally {
+                btn.textContent = '🔐 Iniciar Sesión';
+                btn.disabled = false;
+            }
+        }
+
+        function mostrarError(msg) {
+            const el = document.getElementById('error-msg');
+            el.textContent = msg;
+            el.classList.remove('hidden');
+        }
+    </script>
+</body>
+</html>
