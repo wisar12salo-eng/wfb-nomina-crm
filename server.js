@@ -9,6 +9,11 @@ const fs = require('fs');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+```
+
+**2.** En Railway haz clic en **"Variables"** y agrega:
+```
+PORT = 8080
 const JWT_SECRET = process.env.JWT_SECRET || 'wfb_nomina_secret_2026';
 
 // 1. MIDDLEWARE
@@ -35,7 +40,18 @@ const db = new sqlite3.Database('./wfb_database.db', (err) => {
     else console.log("✅ Conectado a la Base de Datos SQLite (WFB-PRO).");
 });
 
-// 4. CREACIÓN DE TABLAS
+// 1. Primero creamos el Maestro (La tabla de referencia)
+db.run(`CREATE TABLE IF NOT EXISTS empleados (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nombre TEXT NOT NULL,
+    identificacion TEXT UNIQUE NOT NULL,
+    cargo TEXT,
+    salarioBase REAL,
+    fechaIngreso TEXT,
+    estado TEXT DEFAULT 'activo'
+)`);
+
+// 2. Luego creamos la de Nóminas (La que depende del Maestro)
 db.run(`CREATE TABLE IF NOT EXISTS nominas (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     empleado_id INTEGER,
